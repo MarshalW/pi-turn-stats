@@ -10,7 +10,7 @@ pi 扩展：对话统计（Turn Stats）。每次对话交换后，自动记录�
 
 ## 效果截图
 
-![Turn Stats](turn-stats.jpg)
+![Turn Stats](https://github.com/MarshalW/pi-turn-stats/raw/v0.1.2/turn-stats.jpg)
 
 ## 安装
 
