@@ -8,6 +8,10 @@ pi extension: conversation statistics (对话统计). For every exchange, record
 - **状态栏实时显示** — bottom status bar shows the previous exchange's duration / output speed / tokens / cost.
 - **`/turnstats` 命令** — appends a session-cumulative stats card (total exchanges, turns, tokens, cost).
 
+## Screenshots
+
+![Turn Stats](turn-stats.jpg)
+
 ## Installation
 
 Install project-locally (recommended, supports per-project version pinning):
