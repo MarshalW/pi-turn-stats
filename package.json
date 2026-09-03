@@ -1,6 +1,6 @@
 {
   "name": "@marshal/pi-turn-stats",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "pi extension: per-exchange duration, token & cost stats for conversations (stream card + status bar + /turnstats command)",
   "keywords": [
     "pi-package"
