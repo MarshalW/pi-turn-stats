@@ -9,7 +9,8 @@
   "license": "MIT",
   "files": [
     "extensions",
-    "README.md"
+    "README.md",
+    "turn-stats.jpg"
   ],
   "pi": {
     "extensions": [
