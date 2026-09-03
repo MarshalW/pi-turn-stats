@@ -1,41 +1,48 @@
 # @marshal/pi-turn-stats
 
-pi extension: conversation statistics (对话统计). For every exchange, records duration, token usage (input / output / cache read / cache write), and cost.
+pi 扩展：对话统计（Turn Stats）。每次对话交换后，自动记录耗时、token 用量（input / output / cache read / cache write）和费用。
 
-## Features
+## 功能特性
 
-- **对话流统计卡片** — after each reply, appends a stats card to the conversation stream (not sent to the LLM context).
-- **状态栏实时显示** — bottom status bar shows the previous exchange's duration / output speed / tokens / cost.
-- **`/turnstats` 命令** — appends a session-cumulative stats card (total exchanges, turns, tokens, cost).
+- **对话流统计卡片** — 每次回复后，在对话流中追加统计卡片（不会进入 LLM 上下文）。
+- **状态栏实时显示** — 底部状态栏显示上一轮对话的耗时 / 输出速度 / token 数 / 费用。
+- **`/turnstats` 命令** — 追加会话累计统计卡片（总交换次数、总轮次、总 token、总费用）。
 
-## Screenshots
+## 效果截图
 
 ![Turn Stats](turn-stats.jpg)
 
-## Installation
+## 安装
 
-Install project-locally (recommended, supports per-project version pinning):
+推荐项目本地安装（支持按项目锁定版本）：
 
 ```bash
-# From the GitHub repo, pinned to a git tag (SSH)
+# 从 GitHub 仓库安装，指定 tag（SSH）
 pi install -l git:git@github.com:MarshalW/pi-turn-stats@v0.1.0
 ```
 
-## Note
+也可以从 npm 直接安装：
 
-Generated stats are **local-only** — nothing is uploaded anywhere. Reads `turn_end` event usage data and wall-clock timing inside the running pi process.
+```bash
+npm install @marshal/pi-turn-stats
+```
 
-## Development
+## 说明
+
+生成的统计数据**仅本地存储**，不会上传到任何服务器。读取运行中 pi 进程内的 `turn_end` 事件数据和实际耗时。
+
+## 开发
 
 ```bash
 git clone git@github.com:MarshalW/pi-turn-stats.git
 cd pi-turn-stats
-pi install ./        # local install for testing
+pi install ./        # 本地安装，用于测试
 ```
 
-## Release flow
+## 发布流程
 
 ```bash
 git tag vX.Y.Z && git push origin main --tags
-# then on each consumer machine: pi install -l git:...@vX.Y.Z
+# 发布到 npm：npm version patch && npm publish --access public
+# 消费端安装：pi install -l git:git@github.com:MarshalW/pi-turn-stats@vX.Y.Z
 ```
