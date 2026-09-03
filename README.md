@@ -14,18 +14,29 @@ pi 扩展：对话统计（Turn Stats）。每次对话交换后，自动记录�
 
 ## 安装
 
-推荐项目本地安装（支持按项目锁定版本）：
+**推荐方式**：从 npm 安装，国内访问稳定，且可查看安装统计。
 
 ```bash
-# 从 GitHub 仓库安装，指定 tag（SSH）
-pi install -l git:git@github.com:MarshalW/pi-turn-stats@v0.1.0
+# pi 直接安装 npm 包
+pi install -l npm:@marshal/pi-turn-stats
 ```
 
-也可以从 npm 直接安装：
+或使用标准 npm 安装：
 
 ```bash
 npm install @marshal/pi-turn-stats
 ```
+
+> 注意：`pi install -l npm:...` 是 pi 推荐的本地安装方式，会将扩展安装到当前项目；普通 `npm install` 仅下载包，不自动注册为 pi 扩展。
+
+**备选方式**：从 GitHub 安装（适合需要源码或自定义修改的场景）。
+
+```bash
+# 从 GitHub 仓库安装，指定 tag（SSH）
+pi install -l git:git@github.com:MarshalW/pi-turn-stats@v0.1.1
+```
+
+> 国内用户建议优先使用 npm 方式，GitHub 访问可能不稳定。
 
 ## 说明
 
@@ -44,5 +55,7 @@ pi install ./        # 本地安装，用于测试
 ```bash
 git tag vX.Y.Z && git push origin main --tags
 # 发布到 npm：npm version patch && npm publish --access public
-# 消费端安装：pi install -l git:git@github.com:MarshalW/pi-turn-stats@vX.Y.Z
+# 消费端安装：
+#   npm 方式（推荐）：pi install -l npm:@marshal/pi-turn-stats
+#   git 方式（备选）：pi install -l git:git@github.com:MarshalW/pi-turn-stats@vX.Y.Z
 ```
