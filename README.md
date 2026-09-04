@@ -10,7 +10,7 @@ A pi extension that automatically tracks per-exchange duration, token usage (inp
 
 ## Demo
 
-![Turn Stats Demo](turn-stats.gif)
+![Turn Stats Demo](https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats.gif)
 
 ## Screenshots
 
@@ -20,7 +20,7 @@ A pi extension that automatically tracks per-exchange duration, token usage (inp
 
 **English (auto-detected from `LANG=en`)**
 
-![Turn Stats EN](turn-stats_en.png)
+![Turn Stats EN](https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.png)
 
 ## Installation
 
