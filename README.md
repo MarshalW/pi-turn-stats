@@ -8,6 +8,10 @@ pi 扩展：对话统计（Turn Stats）。每次对话交换后，自动记录�
 - **状态栏实时显示** — 底部状态栏显示上一轮对话的耗时 / 输出速度 / token 数 / 费用。
 - **`/turnstats` 命令** — 追加会话累计统计卡片（总交换次数、总轮次、总 token、总费用）。
 
+## 演示动画
+
+![Turn Stats Demo](turn-stats.gif)
+
 ## 效果截图
 
 ![Turn Stats](https://github.com/MarshalW/pi-turn-stats/raw/v0.1.2/turn-stats.jpg)
