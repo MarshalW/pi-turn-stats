@@ -11,7 +11,8 @@
     "extensions",
     "README.md",
     "turn-stats.jpg",
-    "turn-stats.gif"
+    "turn-stats.gif",
+    "turn-stats_en.png"
   ],
   "pi": {
     "extensions": [
