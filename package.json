@@ -12,11 +12,14 @@
     "README.md",
     "turn-stats.jpg",
     "turn-stats.gif",
-    "turn-stats_en.png"
+    "turn-stats_en.png",
+    "turn-stats_en.mp4"
   ],
   "pi": {
     "extensions": [
       "./extensions/turn-stats.ts"
-    ]
+    ],
+    "video": "https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.mp4",
+    "image": "https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.png"
   }
 }

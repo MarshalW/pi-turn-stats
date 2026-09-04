@@ -7,10 +7,13 @@ A pi extension that automatically tracks per-exchange duration, token usage (inp
 - **Stats card in conversation stream** — After each reply, a stats card is appended to the stream (does not enter LLM context).
 - **Real-time status bar** — The bottom status bar shows the last exchange's duration, throughput, token count, and cost.
 - **`/turnstats` command** — Appends a session cumulative stats card (total exchanges, total LLM calls, total tokens, total cost).
+- **Auto i18n** — UI labels automatically switch between Chinese and English based on your system locale (`LANG` / `LC_ALL` / `Intl`).
 
 ## Demo
 
-![Turn Stats Demo](https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats.gif)
+**English locale (`LANG=en`)**
+
+![Turn Stats Demo](https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.mp4)
 
 ## Screenshots
 
@@ -28,22 +31,22 @@ A pi extension that automatically tracks per-exchange duration, token usage (inp
 
 ```bash
 # Install directly with pi
-pi install -l npm:@marshal/pi-turn-stats
+pi install npm:@marshal/pi-turn-stats
 ```
 
 Or standard npm install:
 
 ```bash
-npm install @marshal/pi-turn-stats
+npm install -g @marshal/pi-turn-stats
 ```
 
-> Note: `pi install -l npm:...` is the pi-recommended local install method that registers the extension for the current project. Plain `npm install` only downloads the package without registering it as a pi extension.
+> Note: `pi install npm:...` registers the extension globally. Plain `npm install -g` only downloads the package without registering it as a pi extension.
 
 **Alternative**: Install from GitHub (for source access or custom modifications).
 
 ```bash
-# Install from GitHub repo, specifying tag (SSH)
-pi install -l git:git@github.com:MarshalW/pi-turn-stats@v0.1.1
+# Install from GitHub repo (SSH)
+pi install git:git@github.com:MarshalW/pi-turn-stats
 ```
 
 > Users in China are encouraged to use the npm method, as GitHub access may be unreliable.
@@ -66,6 +69,6 @@ pi install ./        # local install for testing
 git tag vX.Y.Z && git push origin main --tags
 # Publish to npm: npm version patch && npm publish --access public
 # Consumer install:
-#   npm (recommended): pi install -l npm:@marshal/pi-turn-stats
-#   git (fallback):    pi install -l git:git@github.com:MarshalW/pi-turn-stats@vX.Y.Z
+#   npm (recommended): pi install npm:@marshal/pi-turn-stats
+#   git (fallback):    pi install git:git@github.com:MarshalW/pi-turn-stats@vX.Y.Z
 ```
