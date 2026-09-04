@@ -164,6 +164,25 @@ function fmtCost(c: number): string {
 	return `$${c.toFixed(4)}`;
 }
 
+/**
+ * After session replacement (e.g. /new) or reload, pi invalidates the old
+ * extension runner, but a run's `finally` can still deliver agent_settled to
+ * it; any ctx/`pi` access on the stale runner throws. Treat those as
+ * "no UI / no session" and skip side effects instead of erroring.
+ */
+function isStaleCtxError(err: unknown): boolean {
+	return err instanceof Error && err.message.includes("extension ctx is stale");
+}
+
+/** Run a side effect against ctx/`pi`; silently skip when the ctx is stale. */
+function withStaleGuard(fn: () => void): void {
+	try {
+		fn();
+	} catch (err) {
+		if (!isStaleCtxError(err)) throw err;
+	}
+}
+
 export default function (pi: ExtensionAPI) {
 	// ---- session cumulative stats ----
 	const sessionTotals = {
@@ -248,8 +267,10 @@ export default function (pi: ExtensionAPI) {
 
 	// ===== Session start: init status bar =====
 	pi.on("session_start", (_event, ctx) => {
-		if (!ctx.hasUI) return;
-		ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", t("statusWaiting")));
+		withStaleGuard(() => {
+			if (!ctx.hasUI) return;
+			ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", t("statusWaiting")));
+		});
 	});
 
 	// ===== User submits: start timer =====
@@ -258,10 +279,12 @@ export default function (pi: ExtensionAPI) {
 		startTime = Date.now();
 		turnCount = 0;
 		accum = emptyAccum();
-		lastModel = ctx.model?.id ?? "unknown";
-		if (ctx.hasUI) {
-			ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", t("statusRunning")));
-		}
+		withStaleGuard(() => {
+			lastModel = ctx.model?.id ?? "unknown";
+			if (ctx.hasUI) {
+				ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", t("statusRunning")));
+			}
+		});
 	});
 
 	// ===== Each LLM turn ends: accumulate usage =====
@@ -297,27 +320,31 @@ export default function (pi: ExtensionAPI) {
 		sessionTotals.durationMs += durMs;
 
 		if (SHOW_CARD && turnCount > 0) {
-			pi.appendEntry<TurnStatsData>(ENTRY_TYPE, {
-				kind: "exchange",
-				startTime,
-				endTime,
-				turns: turnCount,
-				exchanges: 1,
-				...accum,
-				tokensPerSec: genTps,
-				model: lastModel,
+			withStaleGuard(() => {
+				pi.appendEntry<TurnStatsData>(ENTRY_TYPE, {
+					kind: "exchange",
+					startTime,
+					endTime,
+					turns: turnCount,
+					exchanges: 1,
+					...accum,
+					tokensPerSec: genTps,
+					model: lastModel,
+				});
 			});
 		}
 
-		if (ctx.hasUI) {
-			ctx.ui.setStatus(
-				"turn-stats",
-				ctx.ui.theme.fg(
-					"dim",
-					t("statusDone", fmtDuration(durMs), fmtThroughput(genTps), fmtTokens(accum.totalTokens), fmtCost(accum.cost)),
-				),
-			);
-		}
+		withStaleGuard(() => {
+			if (ctx.hasUI) {
+				ctx.ui.setStatus(
+					"turn-stats",
+					ctx.ui.theme.fg(
+						"dim",
+						t("statusDone", fmtDuration(durMs), fmtThroughput(genTps), fmtTokens(accum.totalTokens), fmtCost(accum.cost)),
+					),
+				);
+			}
+		});
 	});
 
 	// ===== /turnstats: append session cumulative stats card =====
@@ -326,20 +353,22 @@ export default function (pi: ExtensionAPI) {
 		handler: async () => {
 			const sessDurMs = sessionTotals.durationMs;
 			const sessGenTps = calcOutputPerSec(sessionTotals.output, sessDurMs);
-			pi.appendEntry<TurnStatsData>(ENTRY_TYPE, {
-				kind: "session",
-				startTime: sessDurMs > 0 ? Date.now() - sessDurMs : Date.now(),
-				endTime: Date.now(),
-				turns: sessionTotals.exchanges,
-				exchanges: sessionTotals.exchanges,
-				input: sessionTotals.input,
-				output: sessionTotals.output,
-				cacheRead: sessionTotals.cacheRead,
-				cacheWrite: sessionTotals.cacheWrite,
-				totalTokens: sessionTotals.totalTokens,
-				cost: sessionTotals.cost,
-				tokensPerSec: sessGenTps,
-				model: t("sessionModel"),
+			withStaleGuard(() => {
+				pi.appendEntry<TurnStatsData>(ENTRY_TYPE, {
+					kind: "session",
+					startTime: sessDurMs > 0 ? Date.now() - sessDurMs : Date.now(),
+					endTime: Date.now(),
+					turns: sessionTotals.exchanges,
+					exchanges: sessionTotals.exchanges,
+					input: sessionTotals.input,
+					output: sessionTotals.output,
+					cacheRead: sessionTotals.cacheRead,
+					cacheWrite: sessionTotals.cacheWrite,
+					totalTokens: sessionTotals.totalTokens,
+					cost: sessionTotals.cost,
+					tokensPerSec: sessGenTps,
+					model: t("sessionModel"),
+				});
 			});
 		},
 	});
