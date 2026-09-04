@@ -1,21 +1,22 @@
 /**
- * turn-stats.ts — 单次对话耗时 & token 消耗统计
+ * turn-stats.ts — per-exchange duration, token & cost stats
  *
- * 功能：
- * 1. 每次用户发消息到回复完成（before_agent_start → agent_settled，含工具调用循环/重试），
- *    在对话流中追加一张「对话统计」卡片（pi.appendEntry + registerEntryRenderer，
- *    不参与 LLM 上下文，不会发给模型）
- * 2. 底部状态栏实时显示上一次对话的 耗时 / 生成速度 / token / 费用（ctx.ui.setStatus）
- * 3. /turnstats 命令追加当前会话的累计统计卡片
+ * Features:
+ * 1. After each user→reply exchange (before_agent_start → agent_settled),
+ *    append a stats card to the conversation stream (via pi.appendEntry +
+ *    registerEntryRenderer, not part of LLM context).
+ * 2. Status bar shows last exchange duration / throughput / tokens / cost.
+ * 3. /turnstats command appends a session cumulative stats card.
  *
- * 数据来源：
- * - turn_end 事件携带每条 assistant 消息的 usage（input/output/cacheRead/cacheWrite/totalTokens/cost）
- * - before_agent_start / agent_settled 界定一次对话的起止时间
+ * Data sources:
+ * - turn_end event carries per-assistant-message usage
+ *   (input/output/cacheRead/cacheWrite/totalTokens/cost)
+ * - before_agent_start / agent_settled delimit the wall-clock duration
  *
- * 生成速度（tokens/s）：分子**只用输出 token**（自回归解码生成的量），
- * 分母为整次对话的墙钟耗时。绝不能用 totalTokens —— 它包含输入/缓存读/写，
- * 会把速度虚高几十倍（例：输入 2029 + 输出 139 → 2168/13.2s ≈ 164 t/s，
- * 而真实的 139/13.2s ≈ 10.5 t/s）。
+ * Throughput (tok/s): numerator = output tokens only (autoregressive decode),
+ * denominator = wall-clock time of the whole exchange.
+ * Never use totalTokens — it inflates throughput dozens of times because it
+ * includes input + cache read/write.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -23,16 +24,81 @@ import { Box, Text } from "@earendil-works/pi-tui";
 
 const ENTRY_TYPE = "turn-stats";
 
-/** 是否在对话流中追加统计卡片（设为 false 可只保留状态栏） */
+/** Whether to append a stats card after each exchange (false = status bar only) */
 const SHOW_CARD = true;
+
+// ===== i18n: auto-detect locale from system environment =====
+
+type Locale = "zh" | "en";
+
+function detectLocale(): Locale {
+	const env = process.env.LANG ?? process.env.LC_ALL ?? "";
+	if (env.startsWith("zh")) return "zh";
+	try {
+		const resolved = Intl.DateTimeFormat().resolvedLocales();
+		if (resolved.length > 0 && resolved[0].startsWith("zh")) return "zh";
+	} catch { /* Intl not available — fall through */ }
+	return "en";
+}
+
+const locale: Locale = detectLocale();
+
+type Msg = string | ((...args: any[]) => string);
+
+const messages: Record<Locale, Record<string, Msg>> = {
+	zh: {
+		cardTitleExchange: "⏱ 对话统计",
+		cardTitleSession: "📊 会话统计",
+		metaExchange: (dur: string, turns: number, tps: string) =>
+			`耗时 ${dur} · ${turns} 次 LLM 调用 · 输出 ${tps} · 费用 `,
+		metaSession: (ex: number, turns: number, tps: string) =>
+			`累计 ${ex} 次对话 · ${turns} 次 LLM 调用 · 输出 ${tps} · 费用 `,
+		tokenInput: "token 输入 ",
+		tokenOutput: " · 输出 ",
+		cacheRead: " · 缓存读 ",
+		cacheWrite: " / 写 ",
+		tokenTotal: " · 合计 ",
+		statusWaiting: "⏱ 等待对话…",
+		statusRunning: "⏱ 统计中…",
+		cmdDescription: "追加当前会话的累计耗时与 token 统计卡片",
+		sessionModel: "累计",
+	},
+	en: {
+		cardTitleExchange: "⏱ Turn Stats",
+		cardTitleSession: "📊 Session Stats",
+		metaExchange: (dur: string, turns: number, tps: string) =>
+			`${dur} · ${turns} LLM calls · output ${tps} · cost `,
+		metaSession: (ex: number, turns: number, tps: string) =>
+			`${ex} exchanges · ${turns} LLM calls · output ${tps} · cost `,
+		tokenInput: "token input ",
+		tokenOutput: " · output ",
+		cacheRead: " · cache read ",
+		cacheWrite: " / write ",
+		tokenTotal: " · total ",
+		statusWaiting: "⏱ Waiting…",
+		statusRunning: "⏱ Processing…",
+		statusDone: (dur: string, tps: string, tokens: string, cost: string) =>
+			`⏱ ${dur} · output ${tps} · ${tokens} tok · ${cost}`,
+		cmdDescription: "Append session cumulative turn stats card",
+		sessionModel: "Cumulative",
+	},
+};
+
+function t(key: string, ...args: any[]): string {
+	const msg = messages[locale][key] as Msg | undefined;
+	if (typeof msg === "function") return msg(...args);
+	return msg ?? key;
+}
+
+// ===== end i18n =====
 
 interface TurnStatsData {
 	kind: "exchange" | "session";
 	startTime: number;
 	endTime: number;
-	/** LLM 调用次数（一次对话可能多次调用工具形成多个 turn） */
+	/** LLM call count (one exchange may trigger multiple tool-call turns) */
 	turns: number;
-	/** 对话次数（exchange=1，session=累计） */
+	/** Exchange count (1 for a single exchange, cumulative for session) */
 	exchanges: number;
 	input: number;
 	output: number;
@@ -40,7 +106,7 @@ interface TurnStatsData {
 	cacheWrite: number;
 	totalTokens: number;
 	cost: number;
-	/** 生成速度：输出 tok/s（仅 autoregressive 解码输出） */
+	/** Throughput: output tok/s (autoregressive decode only) */
 	tokensPerSec: number;
 	model: string;
 }
@@ -84,8 +150,9 @@ function fmtThroughput(tps: number): string {
 }
 
 /**
- * 生成速度 = 输出 token 数（自回归解码量）÷ 墙钟耗时。
- * 分子只用 output，排除 input / cacheRead / cacheWrite / totalTokens。
+ * Throughput = output tokens (autoregressive decode) ÷ wall-clock elapsed.
+ * Only output tokens — input / cacheRead / cacheWrite / totalTokens are
+ * excluded to avoid inflating throughput.
  */
 function calcOutputPerSec(outputTokens: number, elapsedMs: number): number {
 	return elapsedMs > 0 ? outputTokens / (elapsedMs / 1000) : 0;
@@ -98,21 +165,21 @@ function fmtCost(c: number): string {
 }
 
 export default function (pi: ExtensionAPI) {
-	// ---- 会话累计统计 ----
+	// ---- session cumulative stats ----
 	const sessionTotals = {
 		...emptyAccum(),
 		exchanges: 0,
 		durationMs: 0,
 	};
 
-	// ---- 单次对话统计 ----
+	// ---- per-exchange stats ----
 	let running = false;
 	let startTime = 0;
 	let turnCount = 0;
 	let accum = emptyAccum();
 	let lastModel = "";
 
-	// ===== 统计卡片渲染（对话流内） =====
+	// ===== Stats card renderer (in conversation stream) =====
 	pi.registerEntryRenderer<TurnStatsData>(ENTRY_TYPE, (entry, { expanded }, theme) => {
 		const d = entry.data;
 		if (!d) return new Text(theme.fg("dim", "(no stats)"), 0, 0);
@@ -120,11 +187,12 @@ export default function (pi: ExtensionAPI) {
 		const isSession = d.kind === "session";
 		const dur = fmtDuration(d.endTime - d.startTime);
 		const cost = fmtCost(d.cost);
+		const genTps = fmtThroughput(d.tokensPerSec);
 
 		const box = new Box(1, 1, (s) => theme.bg("customMessageBg", s));
 
-		// 标题行
-		const title = isSession ? "📊 会话统计" : "⏱ 对话统计";
+		// title line
+		const title = isSession ? t("cardTitleSession") : t("cardTitleExchange");
 		box.addChild(
 			new Text(
 				theme.fg("accent", theme.bold(title)) +
@@ -134,11 +202,10 @@ export default function (pi: ExtensionAPI) {
 			),
 		);
 
-		// 耗时 / 次数 / 生成速度 / 费用
-		const genTps = fmtThroughput(d.tokensPerSec);
+		// duration / count / throughput / cost
 		const meta = isSession
-			? `累计 ${d.exchanges} 次对话 · ${d.turns} 次 LLM 调用 · 输出 ${genTps} · 费用 `
-			: `耗时 ${dur} · ${d.turns} 次 LLM 调用 · 输出 ${genTps} · 费用 `;
+			? t("metaSession", d.exchanges, d.turns, genTps)
+			: t("metaExchange", dur, d.turns, genTps);
 		box.addChild(
 			new Text(
 				theme.fg("dim", meta) + theme.fg("text", cost),
@@ -147,25 +214,25 @@ export default function (pi: ExtensionAPI) {
 			),
 		);
 
-		// token 明细
+		// token breakdown
 		box.addChild(
 			new Text(
-				theme.fg("dim", "token 输入 ") +
+				theme.fg("dim", t("tokenInput")) +
 					theme.fg("text", fmtTokens(d.input)) +
-					theme.fg("dim", " · 输出 ") +
+					theme.fg("dim", t("tokenOutput")) +
 					theme.fg("text", fmtTokens(d.output)) +
-					theme.fg("dim", " · 缓存读 ") +
+					theme.fg("dim", t("cacheRead")) +
 					theme.fg("text", fmtTokens(d.cacheRead)) +
-					theme.fg("dim", " / 写 ") +
+					theme.fg("dim", t("cacheWrite")) +
 					theme.fg("text", fmtTokens(d.cacheWrite)) +
-					theme.fg("dim", " · 合计 ") +
+					theme.fg("dim", t("tokenTotal")) +
 					theme.fg("text", fmtTokens(d.totalTokens)),
 				0,
 				0,
 			),
 		);
 
-		// 展开时显示起止时间
+		// expanded: show time range
 		if (expanded && d.startTime > 0) {
 			box.addChild(
 				new Text(
@@ -179,13 +246,13 @@ export default function (pi: ExtensionAPI) {
 		return box;
 	});
 
-	// ===== 会话开始：初始化状态栏 =====
+	// ===== Session start: init status bar =====
 	pi.on("session_start", (_event, ctx) => {
 		if (!ctx.hasUI) return;
-		ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", "⏱ 等待对话…"));
+		ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", t("statusWaiting")));
 	});
 
-	// ===== 用户提交消息：开始计时 =====
+	// ===== User submits: start timer =====
 	pi.on("before_agent_start", (_event, ctx) => {
 		running = true;
 		startTime = Date.now();
@@ -193,11 +260,11 @@ export default function (pi: ExtensionAPI) {
 		accum = emptyAccum();
 		lastModel = ctx.model?.id ?? "unknown";
 		if (ctx.hasUI) {
-			ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", "⏱ 统计中…"));
+			ctx.ui.setStatus("turn-stats", ctx.ui.theme.fg("dim", t("statusRunning")));
 		}
 	});
 
-	// ===== 每个 LLM turn 结束：累计 usage =====
+	// ===== Each LLM turn ends: accumulate usage =====
 	pi.on("turn_end", (event, _ctx) => {
 		if (!running) return;
 		turnCount++;
@@ -214,23 +281,21 @@ export default function (pi: ExtensionAPI) {
 		}
 	});
 
-	// ===== 回复完成：出卡片 + 更新状态栏 =====
+	// ===== Reply settled: emit card + update status bar =====
 	pi.on("agent_settled", (_event, ctx) => {
 		if (!running) return;
 		running = false;
 		const endTime = Date.now();
 		const durMs = endTime - startTime;
-		// 生成速度只统计输出 token（自回归解码），排除输入/缓存读/写
 		const genTps = calcOutputPerSec(accum.output, durMs);
 
-		// 累加会话统计
+		// accumulate session totals
 		for (const key of ["input", "output", "cacheRead", "cacheWrite", "totalTokens", "cost"] as const) {
 			sessionTotals[key] += accum[key];
 		}
 		sessionTotals.exchanges++;
 		sessionTotals.durationMs += durMs;
 
-		// 至少有一次 LLM 调用才出卡片（中途 Esc 取消且未发起调用则跳过）
 		if (SHOW_CARD && turnCount > 0) {
 			pi.appendEntry<TurnStatsData>(ENTRY_TYPE, {
 				kind: "exchange",
@@ -249,18 +314,17 @@ export default function (pi: ExtensionAPI) {
 				"turn-stats",
 				ctx.ui.theme.fg(
 					"dim",
-					`⏱ ${fmtDuration(durMs)} · 输出 ${fmtThroughput(genTps)} · ${fmtTokens(accum.totalTokens)} tok · ${fmtCost(accum.cost)}`,
+					t("statusDone", fmtDuration(durMs), fmtThroughput(genTps), fmtTokens(accum.totalTokens), fmtCost(accum.cost)),
 				),
 			);
 		}
 	});
 
-	// ===== /turnstats：追加会话累计统计卡片 =====
+	// ===== /turnstats: append session cumulative stats card =====
 	pi.registerCommand("turnstats", {
-		description: "追加当前会话的累计耗时与 token 统计卡片",
+		description: t("cmdDescription"),
 		handler: async () => {
 			const sessDurMs = sessionTotals.durationMs;
-			// 生成速度只统计输出 token（自回归解码），排除输入/缓存读/写
 			const sessGenTps = calcOutputPerSec(sessionTotals.output, sessDurMs);
 			pi.appendEntry<TurnStatsData>(ENTRY_TYPE, {
 				kind: "session",
@@ -275,7 +339,7 @@ export default function (pi: ExtensionAPI) {
 				totalTokens: sessionTotals.totalTokens,
 				cost: sessionTotals.cost,
 				tokensPerSec: sessGenTps,
-				model: "累计",
+				model: t("sessionModel"),
 			});
 		},
 	});

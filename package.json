@@ -10,7 +10,8 @@
   "files": [
     "extensions",
     "README.md",
-    "turn-stats.jpg"
+    "turn-stats.jpg",
+    "turn-stats.gif"
   ],
   "pi": {
     "extensions": [
