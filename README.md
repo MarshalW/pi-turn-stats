@@ -11,8 +11,6 @@ A pi extension that automatically tracks per-exchange duration, token usage (inp
 
 ## Demo
 
-**English locale**
-
 ![Turn Stats Demo](https://raw.githubusercontent.com/MarshalW/pi-turn-stats/main/turn-stats.gif)
 
 ## Screenshots
