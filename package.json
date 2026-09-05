@@ -19,7 +19,7 @@
     "extensions": [
       "./extensions/turn-stats.ts"
     ],
-    "video": "https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.mp4",
-    "image": "https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.png"
+    "video": "https://raw.githubusercontent.com/MarshalW/pi-turn-stats/main/turn-stats_en.mp4",
+    "image": "https://raw.githubusercontent.com/MarshalW/pi-turn-stats/main/turn-stats_en.png"
   }
 }

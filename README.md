@@ -13,17 +13,17 @@ A pi extension that automatically tracks per-exchange duration, token usage (inp
 
 **English locale (`LANG=en`)**
 
-![Turn Stats Demo](https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.mp4)
+[![Turn Stats Demo](https://raw.githubusercontent.com/MarshalW/pi-turn-stats/main/turn-stats_en.png)](https://raw.githubusercontent.com/MarshalW/pi-turn-stats/main/turn-stats_en.mp4)
 
 ## Screenshots
 
 **Chinese (default)**
 
-![Turn Stats](https://github.com/MarshalW/pi-turn-stats/raw/v0.1.2/turn-stats.jpg)
+![Turn Stats](https://raw.githubusercontent.com/MarshalW/pi-turn-stats/v0.1.2/turn-stats.jpg)
 
 **English (auto-detected from `LANG=en`)**
 
-![Turn Stats EN](https://github.com/MarshalW/pi-turn-stats/raw/main/turn-stats_en.png)
+![Turn Stats EN](https://raw.githubusercontent.com/MarshalW/pi-turn-stats/main/turn-stats_en.png)
 
 ## Installation
 
